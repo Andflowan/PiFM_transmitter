@@ -30,7 +30,7 @@ It uses [PiFmRds](https://github.com/ChristopheJacquet/PiFmRds) to transmit on F
 ```bash
 git clone https://github.com/Andflowan/PiFM_transmitter.git
 cd PiFM_transmitter
-sudo ./install.sh            # add --samba to also share the playlists folder on the network
+sudo bash install.sh           # add --samba to also share the playlists folder on the network
 ```
 
 Then open `http://<pi-ip>` in a browser (find the IP with `hostname -I`) and tune an FM radio to **99.9 MHz**, close to the Pi.
