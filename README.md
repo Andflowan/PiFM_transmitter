@@ -28,7 +28,7 @@ It uses [PiFmRds](https://github.com/ChristopheJacquet/PiFmRds) to transmit on F
 ## Install
 
 ```bash
-git clone https://github.com/YOUR_USER/PiFM_transmitter.git
+git clone https://github.com/Andflowan/PiFM_transmitter.git
 cd PiFM_transmitter
 sudo ./install.sh            # add --samba to also share the playlists folder on the network
 ```
