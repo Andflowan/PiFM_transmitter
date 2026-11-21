@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PiFM_transmitter</title>
+<style>
+:root{--bg:#14121c;--panel:#1f1b2b;--line:#352f47;--amber:#ffb347;--cream:#f3ead8;--teal:#5ad1c8;--mute:#8b8499}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--cream);font:16px/1.4 "Avenir Next","Trebuchet MS",system-ui,sans-serif;max-width:720px;margin:auto;padding:12px}
+button,input{font:inherit;color:inherit}
+button{background:var(--line);border:0;border-radius:8px;padding:8px 12px;cursor:pointer}
+button:hover{background:#463e5e}
+button:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+input[type=text],input[type=number],input[type=url]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;width:100%}
+.dial{background:var(--panel);border-radius:18px;padding:18px;margin-bottom:12px}
+#freq{font:700 64px/1 Georgia,"Times New Roman",serif;color:var(--amber);text-shadow:0 0 24px #ffb34755}
+#freq small{font-size:22px;color:var(--mute);margin-left:6px}
+.scale{position:relative;height:26px;margin:12px 0;background:repeating-linear-gradient(90deg,var(--mute) 0 1px,transparent 1px 4.88%);-webkit-mask:linear-gradient(#000,#000);border-bottom:1px solid var(--mute)}
+#needle{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--amber);box-shadow:0 0 10px var(--amber);transition:left .4s}
+#title{font-size:20px;margin:8px 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sub{color:var(--mute);font-size:14px;min-height:20px}
+.bar{height:6px;background:var(--line);border-radius:3px;margin:10px 0}
+#prog{height:100%;width:0;background:var(--teal);border-radius:3px}
+.ctl{display:flex;gap:8px;align-items:center}
+.ctl button{font-size:20px;padding:8px 16px}
+.ctl .on{background:var(--teal);color:#10202a}
+#pp{background:var(--amber);color:#2a1a00;min-width:64px}
+nav{display:flex;gap:6px;margin-bottom:10px}
+nav button{flex:1;background:transparent;border-bottom:2px solid var(--line);border-radius:0}
+nav .on{border-color:var(--amber);color:var(--amber)}
+ul{list-style:none;padding:0;margin:8px 0}
+li{display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:10px;padding:8px 10px;margin-bottom:6px}
+li .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+li.cur{outline:2px solid var(--amber)}
+li.over{border-top:3px solid var(--teal)}
+li button{padding:4px 9px;font-size:14px}
+.grip{cursor:grab;color:var(--mute)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips .on{background:var(--amber);color:#2a1a00}
+.row{display:flex;gap:8px;margin:8px 0}
+label.up{display:block;border:2px dashed var(--line);border-radius:12px;padding:18px;text-align:center;cursor:pointer;color:var(--mute)}
+label.up input{display:none}
+.set label{display:block;margin:12px 0 4px;color:var(--mute);font-size:14px}
+.sw{display:flex;gap:18px;margin-top:14px}
+.sw label{display:flex;gap:8px;align-items:center;color:var(--cream);font-size:16px;margin:0}
+.empty{color:var(--mute);text-align:center;padding:18px}
+[hidden]{display:none}
+</style>
+</head>
+<body>
+<div class="dial">
+  <div id="freq">99.9<small>FM</small></div>
+  <div class="scale"><div id="needle"></div></div>
+  <div id="title">Nothing playing</div>
+  <div id="sub"></div>
+  <div class="bar"><div id="prog"></div></div>
+  <div class="ctl">
+    <button data-a="ctl" data-v="prev" aria-label="Previous">⏮</button>
+    <button id="pp" data-a="ctl" data-v="pause" aria-label="Play / pause">▶</button>
+    <button data-a="ctl" data-v="next" aria-label="Next">⏭</button>
+    <button data-a="ctl" data-v="stop" aria-label="Stop">⏹</button>
+    <span style="flex:1"></span>
+    <button id="bsh" data-a="opt" data-v="shuffle" aria-label="Shuffle">🔀</button>
+    <button id="blp" data-a="opt" data-v="loop" aria-label="Loop">🔁</button>
+  </div>
+</div>
+
+<nav>
+  <button data-t="pl" class="on">Playlists</button>
+  <button data-t="lib">Files</button>
+  <button data-t="web">Web radios</button>
+  <button data-t="set">Settings</button>
+</nav>
+
+<section id="pl">
+  <div class="chips" id="chips"></div>
+  <div class="row">
+    <input type="text" id="newpl" placeholder="New playlist name">
+    <button id="addpl">Create</button>
+    <button data-a="delpl" aria-label="Delete playlist">🗑</button>
+  </div>
+  <ul id="plist"></ul>
+</section>
+
+<section id="lib" hidden>
+  <label class="up"><input type="file" id="file" multiple accept="audio/*,.flac,.m4a,.opus"><span id="uptxt">Upload audio files to the active playlist</span></label>
+  <ul id="flist"></ul>
+</section>
+
+<section id="web" hidden>
+  <div class="row"><input type="text" id="wn" placeholder="Name"><input type="url" id="wu" placeholder="https://…/flux.mp3"></div>
+  <button id="addw">Add web radio</button>
+  <ul id="wlist"></ul>
+</section>
+
+<section id="set" hidden class="set">
+  <label for="sf">Frequency (MHz)</label>
+  <input type="number" id="sf" min="76" max="108" step="0.1">
+  <label for="sp">RDS name (8 characters)</label>
+  <input type="text" id="sp" maxlength="8">
+  <p class="empty" style="text-align:left;padding:8px 0">Changing the frequency interrupts the broadcast for about a second.</p>
+</section>
+
+<script>
+const $=s=>document.querySelector(s);
+const api=(u,b)=>fetch(u,{method:b?'POST':'GET',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nm=e=>e.slice(2).split('/').pop(), ic=e=>e[0]=='s'?'📻':'🎵';
+let S=null,key='',drag=null;
+
+function fmt(t){t=Math.floor(t);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')}
+function paintNow(){
+  const n=S.now;
+  $('#freq').innerHTML=S.freq.toFixed(1)+'<small>FM</small>';
+  $('#needle').style.left=((S.freq-87.5)/20.5*100).toFixed(1)+'%';
+  $('#title').textContent=n.playing?n.title:'Nothing playing';
+  $('#sub').textContent=n.playing?(n.live?'Live web radio':fmt(n.pos)+(n.dur?' / '+fmt(n.dur):''))+(S.queue.length?'  ·  '+S.queue.length+' queued':''):'Press ▶ to start “'+S.active+'”';
+  $('#prog').style.width=(n.playing&&n.dur&&!n.live?Math.min(100,n.pos/n.dur*100):0)+'%';
+  $('#pp').textContent=n.playing&&!n.paused?'⏸':'▶';
+  $('#bsh').classList.toggle('on',S.shuffle);$('#blp').classList.toggle('on',S.loop);
+}
+function paintLists(){
+  const cur=S.now.playing?S.now.entry:null, L=S.playlists[S.active]||[];
+  $('#chips').innerHTML=Object.keys(S.playlists).map(p=>`<button data-a="chip" data-v="${esc(p)}" class="${p==S.active?'on':''}">${esc(p)}</button>`).join('');
+  $('#plist').innerHTML=L.length?L.map((e,i)=>`<li draggable="true" data-i="${i}" class="${e==cur?'cur':''}"><span class="grip">⠿</span><span class="t" data-a="play" data-i="${i}">${ic(e)} ${esc(nm(e))}</span><button data-a="up" data-i="${i}" aria-label="Move up">↑</button><button data-a="down" data-i="${i}" aria-label="Move down">↓</button><button data-a="rm" data-i="${i}" aria-label="Remove">✕</button></li>`).join(''):'<li class="empty" style="display:block;width:100%">Empty playlist. Upload files from “Files” or add a web radio.</li>';
+  $('#flist').innerHTML=S.library.length?S.library.map(f=>{const e='f:'+f.name;return `<li><span class="t" data-a="now" data-v="${esc(e)}">🎵 ${esc(f.name)}</span><button data-a="q" data-v="${esc(e)}" title="Play next">⏭</button><button data-a="delf" data-v="${esc(f.name)}" aria-label="Delete">🗑</button></li>`}).join(''):'<li class="empty" style="display:block;width:100%">No files uploaded yet.</li>';
+  const W=Object.entries(S.streams);
+  $('#wlist').innerHTML=W.length?W.map(([n,u])=>{const e='s:'+n;return `<li><span class="t" data-a="now" data-v="${esc(e)}">📻 ${esc(n)}</span><button data-a="add" data-v="${esc(e)}" title="Add to ${esc(S.active)}">＋</button><button data-a="delw" data-v="${esc(n)}" aria-label="Delete">🗑</button></li>`}).join(''):'<li class="empty" style="display:block;width:100%">No web radios saved.</li>';
+  if(document.activeElement.id!='sf')$('#sf').value=S.freq.toFixed(1);
+  if(document.activeElement.id!='sp')$('#sp').value=S.ps;
+}
+async function load(){
+  S=await api('/api/state');
+  const k=JSON.stringify([S.playlists,S.streams,S.library,S.active,S.now.entry,S.now.playing]);
+  paintNow();
+  if(k!=key&&!drag){key=k;paintLists()}
+}
+const save=(tracks)=>api('/api/playlist/save',{name:S.active,tracks});
+
+document.addEventListener('click',async ev=>{
+  const t=ev.target.closest('[data-t]');
+  if(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b==t));
+    ['pl','lib','web','set'].forEach(id=>$('#'+id).hidden=id!=t.dataset.t);return}
+  const b=ev.target.closest('[data-a]');if(!b)return;
+  const a=b.dataset.a,v=b.dataset.v,i=+b.dataset.i,L=[...(S.playlists[S.active]||[])];
+  if(a=='ctl')await api('/api/ctl',{a:v});
+  else if(a=='opt')await api('/api/settings',{[v]:!S[v]});
+  else if(a=='play')await api('/api/play',{pl:S.active,i});
+  else if(a=='now')await api('/api/play',{entry:v});
+  else if(a=='q')await api('/api/play',{queue:v});
+  else if(a=='add'){L.push(v);await save(L)}
+  else if(a=='rm'){const e=L[i];if(e[0]=='f'){if(confirm('Delete “'+nm(e)+'” from the folder?'))await api('/api/track/delete',{name:e.slice(2)})}else{L.splice(i,1);await save(L)}}
+  else if(a=='up'&&i>0){[L[i-1],L[i]]=[L[i],L[i-1]];await save(L)}
+  else if(a=='down'&&i<L.length-1){[L[i+1],L[i]]=[L[i],L[i+1]];await save(L)}
+  else if(a=='chip')await api('/api/playlist/save',{name:v,tracks:S.playlists[v],active:v});
+  else if(a=='delpl'){if(confirm('Delete playlist “'+S.active+'” AND all its music files?'))await api('/api/playlist/delete',{name:S.active})}
+  else if(a=='delf'){if(confirm('Delete '+v+'?'))await api('/api/track/delete',{name:v})}
+  else if(a=='delw')await api('/api/stream/delete',{name:v});
+  await load();
+});
+
+$('#addpl').onclick=async()=>{const n=$('#newpl').value.trim();if(!n)return;
+  await api('/api/playlist/save',{name:n,tracks:[],active:n});$('#newpl').value='';load()};
+$('#addw').onclick=async()=>{const n=$('#wn').value.trim(),u=$('#wu').value.trim();if(!n||!u)return;
+  await api('/api/stream/save',{name:n,url:u});$('#wn').value=$('#wu').value='';load()};
+$('#sf').onchange=async e=>{await api('/api/settings',{freq:e.target.value});load()};
+$('#sp').onchange=async e=>{await api('/api/settings',{ps:e.target.value});load()};
+
+$('#file').onchange=e=>{
+  const fd=new FormData();[...e.target.files].forEach(f=>fd.append('files',f));
+  const x=new XMLHttpRequest();x.open('POST','/api/upload');
+  x.upload.onprogress=p=>$('#uptxt').textContent='Uploading… '+Math.round(p.loaded/p.total*100)+' %';
+  x.onload=()=>{$('#uptxt').textContent='Upload audio files to the active playlist';e.target.value='';load()};
+  x.onerror=()=>$('#uptxt').textContent='Upload failed, try again';
+  x.send(fd)};
+
+const pl=$('#plist');
+pl.addEventListener('dragstart',e=>{const li=e.target.closest('li');if(li)drag=+li.dataset.i});
+pl.addEventListener('dragover',e=>{e.preventDefault();pl.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));e.target.closest('li')?.classList.add('over')});
+pl.addEventListener('drop',async e=>{e.preventDefault();const li=e.target.closest('li');
+  if(li&&drag!=null){const L=[...S.playlists[S.active]],[m]=L.splice(drag,1);L.splice(+li.dataset.i,0,m);await save(L)}
+  drag=null;key='';load()});
+pl.addEventListener('dragend',()=>{drag=null;key='';load()});
+
+load();setInterval(load,1000);
+</script>
+</body>
+</html>
